@@ -1,7 +1,7 @@
-4d33dbf4698c8865df9fd36b85b67ad6 *DESCRIPTION
+856824bfc976ea52cc6a8737f1eb08f3 *DESCRIPTION
 8de8189713ade5e63b2dff781c7ce9b5 *LICENSE
 484fca31ba220b4e31cc6e4d22871fd4 *NAMESPACE
-81499524ee5bcf8d9669652c17c70de5 *NEWS.md
+98f9f08a1eb05b6589ef03a81eb72e5c *NEWS.md
 22d897cada7b3742da8685a960dbe724 *R/cpp11.R
 fd7a758f3c1237a6db4d9cd2eb270dd4 *R/data.R
 c8e46dfeeb27db58188088696ca0f789 *R/functions.R
@@ -9,7 +9,7 @@ c8e46dfeeb27db58188088696ca0f789 *R/functions.R
 07b49297b1aeb38fe3dc89eaa26aaa86 *R/tardis.R
 b56ff2b193ecba52f9ec7f3b10cca008 *R/utils-pipe.R
 03997204aceca5749949e5249b249263 *README.md
-bfb1c54b4c6018d2ab5849a44655ef8e *build/partial.rdb
+3dee49d12bfb251024eabaa1f444685c *build/partial.rdb
 14afee630ecd6fcc0311e729c891d543 *data/dict_emoji.rda
 e250126d8f29aa787920c61bee0f20a3 *data/dict_liu.rda
 8244b511e62a956fa92de31bdf4283e1 *data/dict_tardis_sentiment.rda
@@ -25,7 +25,7 @@ a563981e90018d611971b5ca445e3b01 *man/dict_vader_negations.Rd
 a45c386775025918ffe85d6565a0bcc2 *man/figures/README-unnamed-chunk-5-1.png
 774d9de8e95aa151215efcd304549d41 *man/pipe.Rd
 1445415614c165b1918b16c9f33023d7 *man/tardis.Rd
-1ce97b41715655d922388c5ec1f0cf1c *src/code.cpp
+b200e6dee6fb4255cabdd9611d0e2e55 *src/code.cpp
 d1ee89b77906600050823d3f6a9816e1 *src/cpp11.cpp
 ad83cb67ca4179bc6ab27769a19257b1 *tests/testthat.R
 e128deafd538dc1038ba5ee90f835b40 *tests/testthat/test-tardis.R
