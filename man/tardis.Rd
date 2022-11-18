@@ -12,8 +12,13 @@ tardis(
   dict_modifiers = NA,
   dict_negations = NA,
   sigmoid_factor = 15,
-  verbose = FALSE,
-  use_cpp11 = TRUE
+  negation_factor = 0.75,
+  allcaps_factor = 1.25,
+  punctuation_factor = 1.15,
+  use_punctuation = TRUE,
+  summary_function = c("mean", "median", "max", "min", "sum"),
+  simple_count = FALSE,
+  verbose = FALSE
 )
 }
 \arguments{
@@ -21,23 +26,52 @@ tardis(
 
 \item{text_column}{If using data.frame input, the name of the column of text to analyze.}
 
-\item{dict_sentiments}{Optional sentiment dictionary. A data.frame with two columns: `word` and `value`}
+\item{dict_sentiments}{Optional sentiment dictionary, defaults to internal tardis dictionary.
+A data.frame with two columns: \code{word} and \code{value}.}
 
-\item{dict_modifiers}{Optional modifiers dictionary. A data.frame with two columns: `word` and `value`}
+\item{dict_modifiers}{Optional modifiers dictionary, or "none" to disable modifiers.
+Defaults to internal tardis dictionary. A data.frame with two columns: \code{word} and \code{value}.}
 
-\item{dict_negations}{Optional negation dictionary. A data.frame with one column: `word`}
+\item{dict_negations}{Optional negation dictionary, or "none" to disable negations.
+Defaults to internal tardis dictionary. A data.frame with one column: \code{word}.}
 
-\item{sigmoid_factor}{Numeric, default 15. Factor for scaling sentence scores to -1/+1 using sigmoid function.}
+\item{sigmoid_factor}{Numeric, default 15. Factor for scaling sentence scores to -1/+1
+using a sigmoid function. Set to NA to disable the sigmoid function
+and just return sums of scores, adjusted by any applicable
+negators, modifiers, or punctuation/caps effects.}
+
+\item{negation_factor}{Numeric, default 0.75. Multiplier for damping effects of
+sentiment-bearing terms after negations. Stacks multiplicatively.
+Should probably be less than 1.}
+
+\item{allcaps_factor}{Numeric, default 1.25. Multiplier for scaling effects of
+of sentiment-bearing terms in ALL CAPS. Should probably
+be more than 1, to increase effects.}
+
+\item{punctuation_factor}{Numeric, default 1.15. Multiplier for scaling effects of
+punctuation. A single question mark has no effect, but
+one or more exclamation marks does, and question marks
+have effects in the presence of exclamation marks, up
+to three punctuation marks total.}
+
+\item{use_punctuation}{Boolean, default TRUE. Should we consider sentence-level punctuation?}
+
+\item{summary_function}{For multi-sentence texts, how should we summarise sentence
+scores into a text score? Default "mean", also accepts
+"median", "max", "min", and "sum".}
+
+\item{simple_count}{Boolean, default FALSE. Convenience parameter that overrides many
+other parameters to enable simple counts of dictionary words:
+no modifiers, negations, capitalization, or punctuation
+effects are considered and no sigmoid function is applied.}
 
 \item{verbose}{For debugging--should it print lots of messages to the console?}
-
-\item{use_cpp11}{Boolean, working on cpp11 for optimization.}
 }
 \value{
-A data.frame with one row for each input text and three new columns:
-        `sentiment_mean`: the average sentiment for each sentence in each text.
-        `sentiment_sd`: the standard deviation of sentence sentiments for each text.
-        `sentiment_range`: the range of sentence sentiments for each text.
+A \code{tbl_df} with one row for each input text and three new columns:
+\code{sentiment_mean}: the average sentiment for each sentence in each text.
+\code{sentiment_sd}: the standard deviation of sentence sentiments for each text.
+\code{sentiment_range}: the range of sentence sentiments for each text.
 }
 \description{
 This function uses dictionaries (either the included defaults or user-supplied)

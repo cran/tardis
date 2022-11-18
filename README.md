@@ -1,9 +1,17 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Text Analysis with Rules and Dictionaries for Inferring Sentiment (TARDIS)
+# tardis: Text Analysis with Rules and Dictionaries for Inferring Sentiment (and more!)
 
 <!-- badges: start -->
+
+[![CRAN
+status](https://www.r-pkg.org/badges/version/tardis)](https://CRAN.R-project.org/package=tardis)
+[![Lifecycle:
+experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![Codecov test
+coverage](https://codecov.io/gh/chris31415926535/tardis/branch/main/graph/badge.svg)](https://app.codecov.io/gh/chris31415926535/tardis?branch=main)
+[![R-CMD-check](https://github.com/chris31415926535/tardis/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/chris31415926535/tardis/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 TARDIS uses simple rules and dictionaries to analyze text. By default it
@@ -25,7 +33,14 @@ constructs beyond sentiment.
 
 ## Installation
 
-You can install the development version of tardis like so:
+The latest stable CRAN version can be installed as follows:
+
+``` r
+install.packages("tardis")
+```
+
+You can install the latest development version of tardis from GitHub
+like so:
 
 ``` r
 devtools::install_github("chris31415926535/tardis")
@@ -44,16 +59,16 @@ text <- c("I am happy.",
           "I am really not happy!")
 
 tardis::tardis(text) %>%
-  dplyr::select(text, sentiment_mean) %>%
+  dplyr::select(sentences, score) %>%
   knitr::kable()
 ```
 
-| text                   | sentiment_mean |
-|:-----------------------|---------------:|
-| I am happy.            |      0.5718850 |
-| I am really happy.     |      0.6695383 |
-| I am really happy!     |      0.6987571 |
-| I am really not happy! |     -0.5968026 |
+| sentences              |      score |
+|:-----------------------|-----------:|
+| I am happy.            |  0.5718850 |
+| I am really happy.     |  0.6695383 |
+| I am really happy!     |  0.7197007 |
+| I am really not happy! | -0.6094200 |
 
 Tardis also handles blocks of text differently from other
 sentiment-analysis algorithms, most of which treat blocks of text as
@@ -67,86 +82,70 @@ may be close to neutral overall.
 text <- "This sentence is neutral. This one is really happy! This one is absolutely miserable."
 
 tardis::tardis(text) %>%
-  dplyr::select(text, sentiment_mean, sentiment_sd, sentiment_range) %>%
+  dplyr::select(sentences, score, score_sd, score_range) %>%
   knitr::kable()
 ```
 
-| text                                                                                  | sentiment_mean | sentiment_sd | sentiment_range |
-|:--------------------------------------------------------------------------------------|---------------:|-------------:|----------------:|
-| This sentence is neutral. This one is really happy! This one is absolutely miserable. |      0.0613416 |    0.6455055 |        1.290718 |
+| sentences                                                                             |     score | score_sd | score_range |
+|:--------------------------------------------------------------------------------------|----------:|---------:|------------:|
+| This sentence is neutral. This one is really happy! This one is absolutely miserable. | 0.0683228 | 0.655876 |    1.311661 |
 
-Or even passive-aggressive hostility:
+Or even passive-aggressive hostility, like this exchange that’s neutral
+overall but still clearly hostile:
 
 ``` r
 text <- "Die in a fire 😘" 
 
 tardis::tardis(text) %>%
-  dplyr::select(text, sentiment_mean, sentiment_sd, sentiment_range) %>%
+  dplyr::select(sentences, score, score_sd, score_range) %>%
   knitr::kable()
 ```
 
-| text            | sentiment_mean | sentiment_sd | sentiment_range |
-|:----------------|---------------:|-------------:|----------------:|
-| Die in a fire 😘 |     -0.0664554 |    0.9568319 |        1.353165 |
+| sentences       |      score |  score_sd | score_range |
+|:----------------|-----------:|----------:|------------:|
+| Die in a fire 😘 | -0.0664554 | 0.9568319 |    1.353165 |
 
-## The algorithm
+Tardis also makes it easy to use custom dictionaries, which means it can
+be used to measure other constructs like emotion, rank texts based on
+their similarity to a custom dictionary derived from a cluster analysis
+or LDA, or many other text-based natural language analyses.
 
--   Split text into sentences.
--   Count the number of exclamation points and question marks in the
-    sentence.
--   Split each sentence into tokens. These will usually be words, but
-    can also be multi-word strings (e.g. “supreme court”) or emojis.
-    -   Strip each token’s leading/trailing whitespace and check each
-        token against the dictionary. This captures emojis like “:)”.
-    -   Strip each token’s leading/trailing punctuation.
-    -   Check to see if each token is capitalized.
-    -   Check to see if each token is a modifier (e.g. “very”,
-        “somewhat”).
-    -   Check to see if each token is a negator (e.g. “never”, “not”).
-    -   Make each token lowercase and check it against the dictionary.
-        -   Note this is the second time we check the dictionary: the
-            first time uses original tokens so will match things like
-            “:)” but not like “Happy!” and this time we’ve removed
-            punctuation and made it lowercase so it will match “happy”.
--   Now we have token-level information: its raw dictionary sentiment,
-    if it was capitalized, if it is a modifier, or if it is a negator.
-    -   We compute each token’s *modified* sentiment, which is a
-        function of its own raw sentiment (if applicable), whether it
-        was all-caps, and the three preceding tokens.
-    -   For each negator in the preceding 3 tokens, we flip the current
-        token’s valence and multiply by a value less than 1. The default
-        is -0.75.
-        -   In other words, sentiment changes direction and becomes more
-            muted. “Not bad” is not “bad,” but not as good as “Good.”
-    -   For each modifier in the preceding 3 tokens, we multiply the
-        current token’s score by the appropriate value to scale
-        sentiment up or down. Modifiers are attenuated the farther back
-        they are.
-    -   If the token was ALL CAPS, we scale its sentiment up. The
-        default scale factor is 0.25.
--   We now have our modified token values, which we combine into raw
-    sentence scores.
-    -   We sum all of the modified token scores.
-    -   We add or subtract any sentence-level punctuation score from
-        exclamation points and question marks.
--   We then scale our raw sentence scores to be between -1 and 1 using
-    the sigmoid function $x / \sqrt(x^2 + 15)$. *Note that this should
-    be a user-supplied parameter.*
--   We then compute text-level scores by finding the mean, sd, and range
-    of sentence scores within each text.
+## The algorithm in brief
+
+Tardis first decomposes texts into tokens (words, emojis, or multi-word
+strings), which are scored based on the input dictionary, if they’re in
+ALL CAPS, and the three preceding tokens. Negations like “not” will
+reverse and reduce a token’s score, and modifiers will either increase
+(e.g. “very”) or decrease (e.g. “slightly”) its score. Sentences are
+scored by summing token scores, adjusting for punctuation, and scaling
+results (nonlinearly) so they’re between -1 and 1. Text scores are means
+of sentence scores. Each of these steps can be tweaked or disabled by
+user-supplied parameters. Tardis’s algorithm is inspired by other
+approaches, notably VADER, although it differs from this latter in three
+key respects: first, it is much more customizable; second, token score
+adjustments are all multiplicative, making the order of operations
+unimportant; and third, there are no special cases or exceptions, making
+the rules simpler and more intuitive.
 
 ## Benchmarking
 
 The major bottlenecks have been addressed using `cpp11` so the function
-is reasonably fast, handling roughly 13000 sentences/second using test
+is reasonably fast, handling over 10,000 sentences/second using test
 data from `stringr::sentences`:
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
+<img src="man/figures/README-benchmark_plot-1.png" width="100%" />
 
-## Known issues / Future directions
+## Known issues / Possible future directions
 
--   Testing and generalizing with other dictionaries/semantic
-    constructs.
+-   ACII emojis are slow to process, so the default dictionary includes
+    only some of them.
+-   The default dictionary merges data from two sources, one for text
+    and ASCII emojis and another for UTF-8 emojis, and while I’ve tried
+    to normalize them it’s likely possible to improve on this.
+-   It would be good to do more testing/validation of the default
+    settings.
+-   It would be good to have suggestions for threshold positive/negative
+    values in various scenarios.
 
 ## Similar projects and packages
 

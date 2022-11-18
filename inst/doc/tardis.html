@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Introduction to tardis</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Introduction to tardis</h1>
+
+
+
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr, <span class="at">warn.conflicts =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tardis)</span></code></pre></div>
+<div id="the-value-proposition" class="section level2">
+<h2>The value proposition</h2>
+<p>Most sentiment-analysis algorithms boil down to two things:</p>
+<ul>
+<li><strong>A dictionary</strong> that tells you what words mean;
+and,</li>
+<li><strong>A set of rules</strong> that tells you how to use the
+dictionary.</li>
+</ul>
+<p>By prioritizing flexibility, transparency, and speed, <strong>tardis
+makes it fast and easy to analyze text with customisable dictionaries
+and rules.</strong></p>
+<p>This means you can use the right dictionary and rules for your
+context and study aims.</p>
+</div>
+<div id="the-problem" class="section level2">
+<h2>The problem</h2>
+<p>A sentiment-analysis algorithm is only as good as its dictionary and
+its rules.</p>
+<p>But relying on any single dictionary can cause problems:</p>
+<ul>
+<li>Dictionaries can encode biases that lead to harm against
+communities.</li>
+<li>Dictionaries may be be built for analyzing one corpus (e.g. news
+articles) or community (e.g. American college students, Amazon
+Mechanical Turk contract workers) that makes them inappropriate for
+other corpi (e.g. Twitter posts) or communities (e.g. Etsy
+shoppers).</li>
+<li>Furthermore, even within a community dictionaries may not reflect
+current language use, especially online. (e.g. does “sick” still
+actually mean “good,” or has this fallen out of fashion?)</li>
+</ul>
+<p>And similarly, standard approaches may have problems with their
+rules:</p>
+<ul>
+<li>The rules may be “black-boxed,” or not easily accessible or
+explainable to end-users. But then why should anyone trust them?</li>
+<li>The rules may be too simple and introduce errors (e.g. simply noting
+the presence of positive words without considering negations).</li>
+<li>The rules may be so rigid as to limit the approach’s application in
+new contexts.</li>
+<li>The rules may treat entire texts as “blobs” of language, without
+considering the importance of sentence structure or within-text
+variations in sentiment.</li>
+</ul>
+</div>
+<div id="the-proposal" class="section level2">
+<h2>The proposal</h2>
+<p>Tardis aims to overcome these issues by following three
+principles:</p>
+<ul>
+<li>Users should be able to easily apply their own dictionaries.</li>
+<li>The rules should be clear and easy to explain and understand.</li>
+<li>The rules should be flexible, giving users fine-grained control over
+parameters.</li>
+</ul>
+<p>And given the importance of online communication and large data sets,
+Tardis also meets the following requirements:</p>
+<ul>
+<li>The rules are applied at the level of sentences, and aggregated up
+to input texts.</li>
+<li>Both Unicode and ASCII emojis are supported.</li>
+<li>Multi-word tokens (e.g. “right on”) are supported.</li>
+<li>The algorithm is fast, handling over 10,000 sentences per second on
+a consumer laptop.</li>
+</ul>
+</div>
+<div id="the-algorithm-in-brief" class="section level2">
+<h2>The algorithm in brief</h2>
+<p>Tardis first decomposes texts into tokens (words, emojis, or
+multi-word strings), which are scored based on any dictionary value, if
+they’re in ALL CAPS, and the three preceding tokens. Preceding negations
+like “not” will reverse and reduce a token’s score, and modifiers will
+either increase (e.g. “very”) or decrease (e.g. “slightly”) its score.
+Sentence scores are found by summing token scores, adjusting for
+punctuation, and mapping results to the range <span class="math inline">\((-1, 1)\)</span> with a sigmoid function. Text
+scores are means of sentence scores. Each of these steps can be tweaked
+or disabled by user-supplied parameters. Tardis’s algorithm is inspired
+by other approaches, notably VADER, although it differs from this latter
+in three key respects: first, it is much more customisable; second,
+token score adjustments are all multiplicative, making the order of
+operations unimportant; and third, there are no special cases or
+exceptions, making the rules simpler and more intuitive.</p>
+<p>Because R is a vectorized language, internally tardis creates several
+vectors of length <span class="math inline">\(n\)</span> and stores them
+in a <code>tbl_df</code> data frame, where <span class="math inline">\(n\)</span> is the number of tokens in the input
+texts, and then operates largely by adding and multiplying across these
+vectors. For example, if <span class="math inline">\(neg\)</span> is the
+negation scaling factor, <span class="math inline">\(s_i\)</span> is the
+vector of each token’s dictionary sentiment, and <span class="math inline">\(n_i\)</span> is the number of negations in the
+tokens at indices <span class="math inline">\(i-1\)</span>, <span class="math inline">\(i-2\)</span>, and <span class="math inline">\(i-3\)</span>, then we can calculate the effect of
+negations as <span class="math inline">\(s_i * (-neg)^{n_i}\)</span>.
+The implementation makes heavy use of the package dplyr, although it
+also uses base R and custom C++ functions to increase performance.</p>
+<p>In languages like Python or C++, the preceding algorithm could be
+efficiently implemented through a “moving window” approach that steps
+through each token sequentially and computes a score based on a function
+<span class="math inline">\(f(t_j,t_{j-1},t_{j-2},t_{j-3})\)</span> of
+each token <span class="math inline">\(t_j\)</span> and its three
+preceding tokens.</p>
+<div id="the-default-dictionaries" class="section level3">
+<h3>The default dictionaries</h3>
+<p><em>To be completed…</em></p>
+</div>
+</div>
+<div id="some-examples" class="section level2">
+<h2>Some examples</h2>
+<div id="fixing-false-positives-eds-little-bed" class="section level3">
+<h3>Fixing false positives: Ed’s little bed</h3>
+<p>A simple children’s rhyme shows one pitfall of relying on a fixed
+dictionary. Here we see the sad story of Ed, whose bed is too small:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tardis)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(knitr)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>text <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;This is not good.&quot;</span>, </span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;This is not right.&quot;</span>, </span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;My feet stick out of bed all night.&quot;</span>, </span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;And when I pull them in, oh dear!&quot;</span>, </span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;My feet stick out of bed up here!&quot;</span>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>tardis<span class="sc">::</span><span class="fu">tardis</span>(text) <span class="sc">%&gt;%</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(sentences, score) <span class="sc">%&gt;%</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="left">sentences</th>
+<th align="right">score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">This is not good.</td>
+<td align="right">-0.3453024</td>
+</tr>
+<tr class="even">
+<td align="left">This is not right.</td>
+<td align="right">0.0000000</td>
+</tr>
+<tr class="odd">
+<td align="left">My feet stick out of bed all night.</td>
+<td align="right">0.0000000</td>
+</tr>
+<tr class="even">
+<td align="left">And when I pull them in, oh dear!</td>
+<td align="right">0.4291202</td>
+</tr>
+<tr class="odd">
+<td align="left">My feet stick out of bed up here!</td>
+<td align="right">0.0000000</td>
+</tr>
+</tbody>
+</table>
+<p>Tardis has correctly noted that “not good” is negative, but has
+incorrectly classified the fourth sentence as positive because it
+contains the affectionate term “dear.” To fix this, we can add a new row
+to our default dictionary classifying “oh dear” as a negative term.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>custom_dictionary <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">add_row</span>(tardis<span class="sc">::</span>dict_tardis_sentiment,</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>                                    <span class="at">token =</span> <span class="st">&quot;oh dear&quot;</span>, <span class="at">score =</span> <span class="sc">-</span><span class="dv">1</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>tardis<span class="sc">::</span><span class="fu">tardis</span>(text, <span class="at">dict_sentiments =</span> custom_dictionary) <span class="sc">%&gt;%</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(sentences, score) <span class="sc">%&gt;%</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="left">sentences</th>
+<th align="right">score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">This is not good.</td>
+<td align="right">-0.3453024</td>
+</tr>
+<tr class="even">
+<td align="left">This is not right.</td>
+<td align="right">0.0000000</td>
+</tr>
+<tr class="odd">
+<td align="left">My feet stick out of bed all night.</td>
+<td align="right">0.0000000</td>
+</tr>
+<tr class="even">
+<td align="left">And when I pull them in, oh dear!</td>
+<td align="right">-0.2846456</td>
+</tr>
+<tr class="odd">
+<td align="left">My feet stick out of bed up here!</td>
+<td align="right">0.0000000</td>
+</tr>
+</tbody>
+</table>
+<p>Of course, our choice to assign “oh dear” a sentiment value of -1 was
+arbitrary, but with this change tardis correctly flags the fourth
+sentence as negative. This demonstrates how easy it is to adapt tardis’s
+dictionaries to a specific context.</p>
+</div>
+<div id="identifying-sarcasm-in-online-communications" class="section level3">
+<h3>Identifying sarcasm in online communications</h3>
+<p>Here are three two-sentence texts that have similarly neutral mean
+sentiments, but very different meanings.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>text <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;I guess so, that might be fine. I don&#39;t know.&quot;</span>,</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;Wow, you&#39;re really smart. MORON!&quot;</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;It&#39;s the worst idea I&#39;ve ever heard 😘&quot;</span> )</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>tardis<span class="sc">::</span><span class="fu">tardis</span>(text) <span class="sc">%&gt;%</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>()</span></code></pre></div>
+<table>
+<colgroup>
+<col width="58%" />
+<col width="13%" />
+<col width="12%" />
+<col width="15%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">sentences</th>
+<th align="right">score</th>
+<th align="right">score_sd</th>
+<th align="right">score_range</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">I guess so, that might be fine. I don’t know.</td>
+<td align="right">0.1011443</td>
+<td align="right">0.1430397</td>
+<td align="right">0.2022887</td>
+</tr>
+<tr class="even">
+<td align="left">Wow, you’re really smart. MORON!</td>
+<td align="right">0.0767885</td>
+<td align="right">1.0030603</td>
+<td align="right">1.4185415</td>
+</tr>
+<tr class="odd">
+<td align="left">It’s the worst idea I’ve ever heard 😘</td>
+<td align="right">-0.0073832</td>
+<td align="right">0.8732911</td>
+<td align="right">1.2350202</td>
+</tr>
+</tbody>
+</table>
+<p>Only the first sentence is genuinely neutral; the second two express
+two wildly different sentiments that <em>on average</em> are neutral,
+but to most human readers imply a strong emotional value. Tardis also
+returns the standard deviation and ranges of within-text sentence
+sentiments, and we can see that the ranges for the two sarcastic texts
+are much larger than for the truly neutral text. Of course, these
+examples are blunt and not particularly funny, but they show the use of
+looking beyond the mean when studying sentiment in informal online
+communications.</p>
+</div>
+<div id="simple-counts" class="section level3">
+<h3>Simple counts</h3>
+<p>In some cases, researchers may have pre-built dictionaries and be
+interested in simply detecting those words, without worrying about any
+of the more complex rules described above. For this use case, tardis has
+a convenience parameter <code>simple_count</code> which, when
+<code>TRUE</code>, disables most of the logic and returns simple sums of
+token values. Tardis also sends the user a warning to confirm this is
+the expected behaviour.</p>
+<p>For example:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dict_cats <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">token =</span> <span class="fu">c</span>(<span class="st">&quot;cat&quot;</span>, <span class="st">&quot;cats&quot;</span>), <span class="at">score =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">1</span>))</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>text <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;I love cats.&quot;</span>, <span class="st">&quot;Not a cat?!?!&quot;</span>, <span class="st">&quot;CATS CATS CATS!!!&quot;</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>tardis<span class="sc">::</span><span class="fu">tardis</span>(text, <span class="at">dict_sentiments =</span> dict_cats, <span class="at">simple_count =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(sentences, score) <span class="sc">%&gt;%</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  knitr<span class="sc">::</span><span class="fu">kable</span>()</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; Warning in tardis::tardis(text, dict_sentiments = dict_cats, simple_count =</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; TRUE): Parameter simple_count = TRUE overrides most other parameters. Make sure</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a><span class="co">#&gt; this is intended!</span></span></code></pre></div>
+<table>
+<thead>
+<tr class="header">
+<th align="left">sentences</th>
+<th align="right">score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">I love cats.</td>
+<td align="right">1</td>
+</tr>
+<tr class="even">
+<td align="left">Not a cat?!?!</td>
+<td align="right">1</td>
+</tr>
+<tr class="odd">
+<td align="left">CATS CATS CATS!!!</td>
+<td align="right">3</td>
+</tr>
+</tbody>
+</table>
+<p>Note that the column names are unchanged, although the interpretation
+differs.</p>
+</div>
+<div id="the-algorithm-in-excruciating-detail" class="section level3">
+<h3>The algorithm in excruciating detail</h3>
+<ul>
+<li>Texts are decomposed into sentences.
+<ul>
+<li>By default, we count the number of exclamation and question marks in
+each sentence for future use.</li>
+<li>Emojis are treated as sentences.</li>
+</ul></li>
+<li>Sentences are decomposed into tokens, which are usually words but
+can also be emojis (e.g. “:)”) or multi-word strings (e.g. “oh
+dear”).</li>
+<li>Tokens are then checked against three dictionaries and classified
+into one of four groups:
+<ul>
+<li><strong>Sentiment-bearing tokens</strong> have positive or negative
+sentiment values. For example, “happy” might have a value of +1 and
+“sad” might have a value of -1.</li>
+<li><strong>Modifiers</strong> amplify or damp the value of subsequent
+sentiment-bearing tokens. For example, “very” might amplify future
+values and “somewhat” might damp them.</li>
+<li><strong>Negators</strong> reverse the direction and reduce the
+amplitude of subsequent sentiment-bearing tokens. The intuitive
+justification is that “not bad” is positive, but not as positive as
+“bad” is negative.</li>
+<li><strong>Unidentified tokens</strong> that fall into none of the
+preceding categories have no direct effect.</li>
+</ul></li>
+</ul>
+<p>Once a text has been broken down into sentences and tokens, scores
+are built back up starting from the tokens.</p>
+<ul>
+<li>If our sentence is a string of <span class="math inline">\(n\)</span> tokens, then a sentiment-bearing token
+<span class="math inline">\(t_j\)</span> at index <span class="math inline">\(j\)</span> has a sentiment that is a function of
+itself and its three preceding tokens.
+<ul>
+<li>If <span class="math inline">\(t_j\)</span> is in ALL CAPS, then its
+sentiment is scaled up by a multiplicative factor.</li>
+<li>Modifiers work by scaling a token’s score up or down by a
+user-supplied multiplier. Modifiers are less influential the farther
+back they are, and scale down to 95% and 90% efficacy at two and three
+steps back respectively.</li>
+<li>Negators reverse a token’s sign and decrease its amplitude by a
+user-supplied multiplier. The intuition is that “not bad” is in the
+direction of “good,” but not quite as good as “bad” is bad.</li>
+</ul></li>
+<li>Sentence scores are computed from their tokens and punctuation.
+<ul>
+<li>Adjusted token scores are summed.</li>
+<li>Sentence sums are then adjusted based on exclamation and question
+marks. A single question mark has no effect, but otherwise we count the
+number of exclamation marks and punctuation marks up to three, and
+multiply the sentence sum by the punctuation factor that many
+times.</li>
+<li>Finally, we optionally scale the punctuation-adjusted sentence sums
+with a sigmoid function to map the values to the range <span class="math inline">\((-1,1)\)</span>.</li>
+</ul></li>
+<li>Texts
+<ul>
+<li>Texts are scored based on their constitutive sentences.</li>
+<li>By default, we take the mean of the sentence scores. However, users
+can also use other summary functions (e.g. median, max, min).</li>
+<li>The standard deviation and range of each text’s sentence scores is
+also returned.</li>
+</ul></li>
+</ul>
+</div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

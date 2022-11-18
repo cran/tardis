@@ -26,14 +26,38 @@
 #'
 #' @param input_text Text to analyze, either a character vector or a data.frame with a column of text.
 #' @param text_column If using data.frame input, the name of the column of text to analyze.
-#' @param dict_sentiments Optional sentiment dictionary. A data.frame with two columns: `word` and `value`
-#' @param dict_modifiers Optional modifiers dictionary. A data.frame with two columns: `word` and `value`
-#' @param dict_negations Optional negation dictionary. A data.frame with one column: `word`
-#' @param sigmoid_factor Numeric, default 15. Factor for scaling sentence scores to -1/+1 using sigmoid function.
+#' @param dict_sentiments Optional sentiment dictionary, defaults to internal tardis dictionary.
+#'                        A data.frame with two columns: `word` and `value`.
+#' @param dict_modifiers Optional modifiers dictionary, or "none" to disable modifiers.
+#'                       Defaults to internal tardis dictionary. A data.frame with two columns: `word` and `value`.
+#' @param dict_negations Optional negation dictionary, or "none" to disable negations.
+#'                       Defaults to internal tardis dictionary. A data.frame with one column: `word`.
+#' @param sigmoid_factor Numeric, default 15. Factor for scaling sentence scores to -1/+1
+#'                       using a sigmoid function. Set to NA to disable the sigmoid function
+#'                       and just return sums of scores, adjusted by any applicable
+#'                       negators, modifiers, or punctuation/caps effects.
+#' @param negation_factor Numeric, default 0.75. Multiplier for damping effects of
+#'                        sentiment-bearing terms after negations. Stacks multiplicatively.
+#'                        Should probably be less than 1.
+#' @param allcaps_factor Numeric, default 1.25. Multiplier for scaling effects of
+#'                       of sentiment-bearing terms in ALL CAPS. Should probably
+#'                       be more than 1, to increase effects.
+#' @param punctuation_factor Numeric, default 1.15. Multiplier for scaling effects of
+#'                           punctuation. A single question mark has no effect, but
+#'                           one or more exclamation marks does, and question marks
+#'                           have effects in the presence of exclamation marks, up
+#'                           to three punctuation marks total.
+#' @param use_punctuation Boolean, default TRUE. Should we consider sentence-level punctuation?
+#' @param summary_function For multi-sentence texts, how should we summarise sentence
+#'                         scores into a text score? Default "mean", also accepts
+#'                         "median", "max", "min", and "sum".
+#' @param simple_count Boolean, default FALSE. Convenience parameter that overrides many
+#'                     other parameters to enable simple counts of dictionary words:
+#'                     no modifiers, negations, capitalization, or punctuation
+#'                     effects are considered and no sigmoid function is applied.
 #' @param verbose For debugging--should it print lots of messages to the console?
-#' @param use_cpp11 Boolean, working on cpp11 for optimization.
 #'
-#' @return A data.frame with one row for each input text and three new columns:
+#' @return A `tbl_df` with one row for each input text and three new columns:
 #'         `sentiment_mean`: the average sentiment for each sentence in each text.
 #'         `sentiment_sd`: the standard deviation of sentence sentiments for each text.
 #'         `sentiment_range`: the range of sentence sentiments for each text.
@@ -45,22 +69,44 @@ tardis <- function(
   dict_modifiers = NA,
   dict_negations = NA,
   sigmoid_factor = 15,
+  negation_factor = 0.75,
+  allcaps_factor = 1.25,
+  punctuation_factor = 1.15,
+  use_punctuation = TRUE,
+  summary_function = c("mean","median", "max", "min", "sum"),
+  simple_count = FALSE,
   verbose = FALSE
-  , use_cpp11 = TRUE
-
-
 ) {
   # for dplyr data masking
-  sentences_orig <- sentence <- word <- negation1 <- negation2 <- negation3 <- modifier1 <- modifier2 <- modifier3 <- text_id <- sentence_id <- sentiment_word <- punct_exclamation <- punct_question <- sentence_sum <- sentence_punct <- sentence_score <- NULL
+  sentences <- sentence <- word <- negation1 <- negation2 <- negation3 <- modifier1 <- modifier2 <- modifier3 <- text_id <- sentence_id <- sentiment_word <- punct_exclamation <- punct_question <- sentence_sum <- sentence_punct <- sentence_score <- NULL
 
-  #verbose <- TRUE
+  summary_function <- match.arg(summary_function, summary_function)
 
-  #if (verbose) warning("Still need to support ascii emojis like :) and :(")
+  # in case it's null by accident, set it to default. this happens sometimes with ... calls, need to debug
+  if (is.null(sigmoid_factor)) sigmoid_factor <- 15
+
+  if (simple_count) {
+    warning("Parameter simple_count = TRUE overrides most other parameters. Make sure this is intended!")
+    dict_modifiers <- "none"
+    dict_negations <- "none"
+    sigmoid_factor <- NA
+    negation_factor <- 1
+    allcaps_factor <- 1
+    use_punctuation <- FALSE
+    summary_function <- "sum"
+  }
+
+  # set up summary function
+  sum_fun <- switch(summary_function,
+         "mean" = mean,
+         "median" = stats::median,
+         "max" = max,
+         "min" = min,
+         "sum" = sum)
 
   # multiplicative scale factors for negations and all caps words
-  negation_factor <- 0.75
-  allcaps_factor  <- 0.25 # this has 1 added to it before multiplying! anything over 0 represents an increase, anything below 1 represents a decrease
-
+  # allcaps_factor needs 1 subtracted here because of how it's treated later
+  allcaps_factor <- allcaps_factor - 1
 
   ################################.
   # INPUT TEXT SETUP ----
@@ -70,7 +116,7 @@ tardis <- function(
     if (verbose) message ("vector input")
     text_column <- "text"
     original_input <- stringr::str_trim(input_text)
-    sentences <- dplyr::tibble(sentences_orig = original_input)
+    sentences <- dplyr::tibble(sentences = original_input)
     final_output <- sentences
   }
 
@@ -80,68 +126,151 @@ tardis <- function(
     if (verbose) message ("data frame input")
     original_input <- unlist(input_text[text_column])
     sentences <- dplyr::rename(input_text,
-                               sentences_orig = dplyr::all_of(text_column))
+                               sentences = dplyr::all_of(text_column))
     final_output <- input_text
   }
 
+
+  #################### -
+  # REMOVE APOSTROPHES FROM INPUT TEXT
+
+  sentences$sentences <- gsub(x = sentences$sentences, pattern = "'", replacement = "", fixed = TRUE)
+  sentences$sentences <- gsub(x = sentences$sentences, pattern = "\u2019", replacement = "", fixed = TRUE)
 
   ########################################.
   # DICTIONARY SETUP ----
 
   # Sentiments
-  if (all(is.na(dict_sentiments))){
+  if (all(is.na(dict_sentiments)) | all(is.null(dict_sentiments))){
     if (verbose) message ("Using default sentiments dictionary.")
     dict_sentiments <- tardis::dict_tardis_sentiment
   }
 
-  dict_sentiments$word <- stringr::str_squish(dict_sentiments$word)
+  # remove any extra whitespace and apostrophes
+  dict_sentiments$token <- stringr::str_squish(dict_sentiments$token)
+  dict_sentiments$token <- gsub(x = dict_sentiments$token, pattern = "'", replacement = "", fixed = TRUE)
+  dict_sentiments$token <- gsub(x = dict_sentiments$token, pattern = "\u2019", replacement = "", fixed = TRUE)
 
   # IF MULTI-WORD NGRAMS IN SENTIMENT DICTIONARY
   # if there are any multi-word ngrams (e.g. "supreme court")
-  multi_word_indices <- grep(pattern = " ", x = dict_sentiments$word, fixed = TRUE)
+  multi_word_indices <- grep(pattern = " ", x = dict_sentiments$token, fixed = TRUE)
   if (length(multi_word_indices) > 0) {
     if (verbose) message ("Found multi-word ngrams in sentiment dictionary.")
     for (i in 1:length(multi_word_indices)) {
-      old_word <- dict_sentiments$word[[multi_word_indices[[i]]]]
-      new_word <- gsub(x = old_word, pattern = " ", replacement = "X", fixed = TRUE)
+      old_word <- dict_sentiments$token[[multi_word_indices[[i]]]]
+      new_word <- gsub(x = old_word, pattern = " ", replacement = "x", fixed = TRUE)
 
-      dict_sentiments$word[[multi_word_indices[[i]]]] <- new_word
-      sentences$sentences_orig <- gsub(x = sentences$sentences_orig, pattern = old_word, replacement = new_word, fixed = TRUE)
+      dict_sentiments$token[[multi_word_indices[[i]]]] <- new_word
+      sentences$sentences <- gsub(x = sentences$sentences, pattern = old_word, replacement = new_word, fixed = TRUE)
 
     }
 
   }
 
-  dict_sentiments_vec <- dict_sentiments$sentiment
-  names(dict_sentiments_vec) <- dict_sentiments$word
+  dict_sentiments_vec <- dict_sentiments$score
+  names(dict_sentiments_vec) <- dict_sentiments$token
 
   # Modifiers
-  if (all(is.na(dict_modifiers))){
-    dict_modifiers <- tardis::dict_vader_modifiers
+
+  # if no dictionary supplied by user, use default dictionary
+  if (all(is.na(dict_modifiers)) | all(is.null(dict_modifiers))){
+    dict_modifiers <- tardis::dict_modifiers
   }
-  dict_modifiers_vec <- dict_modifiers$booster_value
-  names(dict_modifiers_vec) <- dict_modifiers$word
+
+  # if user said "none", we're not using modifiers. otherwise set up vector dictionary
+  if (all(dict_modifiers == "none")) {
+    if (verbose) message ("Disabling modifiers.")
+    use_modifiers <- FALSE
+  } else {
+    use_modifiers <- TRUE
+
+    # remove extra whitespace and apostrophes
+    dict_modifiers$token <- stringr::str_squish(dict_modifiers$token)
+    dict_modifiers$token <- gsub(x = dict_modifiers$token, pattern = "'", replacement = "", fixed = TRUE)
+    dict_modifiers$token <- gsub(x = dict_modifiers$token, pattern = "\u2019", replacement = "", fixed = TRUE)
+
+
+    # IF MULTI-WORD NGRAMS IN MODIFIERS DICTIONARY
+    # if there are any multi-word ngrams (e.g. "gosh darn", "bad ass")
+    multi_word_indices_mod <- grep(pattern = " ", x = dict_modifiers$token, fixed = TRUE)
+    if (length(multi_word_indices_mod) > 0) {
+
+      if (verbose) message ("Found multi-word ngrams in modifiers dictionary.")
+
+      for (i in 1:length(multi_word_indices_mod)) {
+        old_word <- dict_modifiers$token[[multi_word_indices_mod[[i]]]]
+        new_word <- gsub(x = old_word, pattern = " ", replacement = "x", fixed = TRUE)
+
+        dict_modifiers$token[[multi_word_indices_mod[[i]]]] <- new_word
+        sentences$sentences <- gsub(x = sentences$sentences, pattern = old_word, replacement = new_word, fixed = TRUE)
+
+      }
+
+    }
+
+    dict_modifiers_vec <- dict_modifiers$score
+    names(dict_modifiers_vec) <- dict_modifiers$token
+  }
 
   # Negations
-  if (all(is.na(dict_negations))){
-    dict_negations <- tardis::dict_vader_negations
+
+  # if no dictionary supplied by user, use default dictionary
+  if (all(is.na(dict_negations)) | all(is.null(dict_negations))){
+    dict_negations <- tardis::dict_negations
   }
-  dict_negations_vec <- rep(1, nrow(dict_negations))
-  names(dict_negations_vec) <- dict_negations$word
+
+  # if user said "none", we're not using negators. otherwise set up vector dictionary
+  if (all(dict_negations == "none")) {
+    if (verbose) message ("Disabling negations.")
+    use_negations <- FALSE
+  } else {
+    use_negations <- TRUE
+
+    # remove extra whitespace and apostrophes
+    dict_negations$token <- stringr::str_squish(dict_negations$token)
+    dict_negations$token <- gsub(x = dict_negations$token, pattern = "'", replacement = "", fixed = TRUE)
+    dict_negations$token <- gsub(x = dict_negations$token, pattern = "\u2019", replacement = "", fixed = TRUE)
+
+
+    # IF MULTI-WORD NGRAMS IN NEGATIONS DICTIONARY
+    # if there are any multi-word ngrams (e.g. "ain't no")
+    multi_word_indices_neg <- grep(pattern = " ", x = dict_negations$token, fixed = TRUE)
+    if (length(multi_word_indices_neg) > 0) {
+
+      if (verbose) message ("Found multi-word ngrams in modifiers dictionary.")
+
+      for (i in 1:length(multi_word_indices_neg)) {
+        old_word <- dict_negations$token[[multi_word_indices_neg[[i]]]]
+        new_word <- gsub(x = old_word, pattern = " ", replacement = "x", fixed = TRUE)
+
+        dict_negations$token[[multi_word_indices_neg[[i]]]] <- new_word
+        sentences$sentences <- gsub(x = sentences$sentences, pattern = old_word, replacement = new_word, fixed = TRUE)
+
+      }
+
+    }
+
+    dict_negations_vec <- rep(1, nrow(dict_negations))
+    names(dict_negations_vec) <- dict_negations$token
+  }
+
 
   #################### -
   # SPLIT TEXT INTO SENTENCES ----
 
-  if (!use_cpp11)  result <- split_text_into_sentences(sentences, emoji_regex_internal = emoji_regex_internal, dict_sentiments = dict_sentiments)
-  if (use_cpp11)  result <- split_text_into_sentences_cpp11(sentences, emoji_regex_internal = emoji_regex_internal, dict_sentiments = dict_sentiments)
+  result <- split_text_into_sentences_cpp11(sentences, emoji_regex_internal = emoji_regex_internal, dict_sentiments = dict_sentiments)
 
   ######################## -
   # SENTENCE PUNCTUATION  ----
 
   # count instances of exclamation points and double question marks
-  result$punct_exclamation <- stringi::stri_count_fixed(result$sentence, pattern = "!")
-  result$punct_question <- stringi::stri_count_fixed(result$sentence, pattern = "?")
-
+  # or set them to zero if we're not considering punctuation
+  if (use_punctuation){
+    result$punct_exclamation <- stringi::stri_count_fixed(result$sentence, pattern = "!")
+    result$punct_question <- stringi::stri_count_fixed(result$sentence, pattern = "?")
+  } else {
+    result$punct_exclamation <- result$punct_question <- 0
+  }
   ######################## -
   # SPLIT INTO WORDS ----
   # NB need stri_enc_tooutf8 if using rcpp
@@ -174,11 +303,11 @@ tardis <- function(
 
   # find all negations
   # much faster than the capitalization stuff
-  result <- handle_negations(result, dict_negations_vec, negation_factor)
+  result <- handle_negations(result, dict_negations_vec, negation_factor, use_negations)
 
   ##########################-
   # MODIFIERS ----
-  result <- handle_modifiers(result, dict_modifiers_vec)
+  result <- handle_modifiers(result, dict_modifiers_vec, use_modifiers)
 
 
   ########################-
@@ -192,18 +321,9 @@ tardis <- function(
   result$sentiment1[is.na(result$sentiment1)] <- 0
   result$sentiment2[is.na(result$sentiment2)] <- 0
 
-  # this purrr::map is kind of slow
+  # original purrr::map was kind of slow
   # rcpp function brings ~ 100ms down to ~ 18
-  if (use_cpp11) result$sentiment <- get_nonzero_value_cpp11(result$sentiment1, result$sentiment2)
-  if (!use_cpp11) {
-    result$sentiment <- purrr::map2_dbl(result$sentiment1, result$sentiment2, function(x,y) {
-      if (x == y) output <- x
-      if (x ==0 & y != 0) output <- y
-      if (x !=0 & y == 0) output <- x
-      if (x !=0 & y != 0 & x != y) output <- x # should we issue a warning here?
-      return(output)
-    })
-  }
+  result$sentiment <- get_nonzero_value_cpp11(result$sentiment1, result$sentiment2)
 
   # process word-level sentiments
   # here we apply all the vectors we've built so far: applying to the sentiment-bearing
@@ -215,57 +335,173 @@ tardis <- function(
   ########################-
   # SENTENCE SCORES ----
   # get sentence-level scores
-  # This is a bottleneck, but using base R and data.table internally helped
+  # This is a bottleneck, but using base R helped
 
-  result_sentences <- handle_sentence_scores(result, with_dplyr = FALSE, with_dt = FALSE, sigmoid_factor = sigmoid_factor)
+  result_sentences <- handle_sentence_scores(result, sigmoid_factor = sigmoid_factor)
 
 
   #################-
   # TEXT SCORES ----
+  # we're using the summary function defined up top
   result_text <- result_sentences %>%
     dplyr::group_by(text_id) %>%
     dplyr::summarise(
-      sentiment_mean = mean(sentence_score),
-      sentiment_sd = stats::sd(sentence_score),
-      sentiment_range = max(sentence_score) - min(sentence_score))
+      score = sum_fun(sentence_score),
+      score_sd = stats::sd(sentence_score),
+      score_range = max(sentence_score) - min(sentence_score))
 
   result_text <- dplyr::as_tibble(result_text)
 
   # add back original text, remove text_id column
-  #result_text[text_column] <- original_input
   result_text$text_id <- NULL
 
-  # reorder to put text first
-  #result_text <- result_text[,c(4,1,2,3)]
-
   dplyr::bind_cols(final_output, result_text)
-  #result_text
+
 }
 
 
-# custom function to lag a vector based on the values in an index vector
-# essentially a custom version of dplyr::group() %>% dplyr::lag() but MUCH faster.
-# vector_index is a vector of monotonically increasing integers indicating groups
-# vec_to_lag is the vector to be lagged
-# NOTE this seems 50x faster than the dplyr functions, which were the bottleneck
-# this could be easily converted to Rcpp if necessary / worth it
-lag1_indexed_vector <- function(vector_index, vec_to_lag) {
 
-  vec_length <- length(vector_index)
-  vec_lagged1 <- rep(0, vec_length)
-  last_id <- 0
+#' Analyze text with more than one dictionary
+#'
+#' This convenience function takes a text and a set of dictionaries, and calls
+#' `tardis::tardis()` once for each dictionary. Other parameters are also passed
+#' along to `tardis()`.
+#'
+#' Dictionaries must be in a single `tbl_df` with at least two columns:
+#' `token`, containing the tokens belonging to each dictionary; and `dicionary`,
+#'  which contains a unique identifier mapping each token to a dictionary.
+#'  Weights, if present, must be in a column named `score`.
+#'
+#'  Tokens can be mapped to multiple dictionaries, but each row maps one token
+#'  to one dictionary.
+#'
+#' @param input_text A text to be analyzed, either a `tbl_df` or a character vector.
+#' @param text_column If `tbl_df` input, a character with the name of the input
+#'                    column containing the text to be analyzed.
+#' @param dictionaries A single `tbl_df` with columns `dictionary`, `token`, and
+#'                     (optionally, for weighted dictionaries) `score`.
+#' @param ... Other parameters passed on to `tardis::tardis()`.
+#'
+#' @return A `tbl_df` with new columns for each dictionary.
+#'
+#' @examples
+#' \dontrun{
+#' library(magrittr)
+#' # Get NRC emotions dataset from textdata package
+#' nrc_emotion <- textdata::lexicon_nrc() %>%
+#'   dplyr::rename(token = word, dictionary = sentiment) %>%
+#'   dplyr::mutate(score = 1)
+#'
+#' # set up some input text
+#' text <- dplyr::tibble(body = c("I am so angry!", "I am angry.",
+#'   "I'm not angry.", "Your mother and I aren't angry, we're just disappointed."))
+#'
+#' emotions <- tardis_multidict(input_text = text, text_column = "body",
+#'   dictionaries = nrc_emotion) %>%
+#'   dplyr::select(body, score_anger, score_sadness)
+#'
+#'  emotions
+#' }
+#' @export
+tardis_multidict <- function(input_text, text_column = NA, dictionaries, ...) {
 
-  for (i in 1:vec_length){
-    #message(i)
-    # new sentence id
-    if ((vector_index[[i]] != last_id)  ) {
-      last_id <- vector_index[[i]]
-      vec_lagged1[[i]] <- 0
-    } else {
-      vec_lagged1[[i]] <- vec_to_lag[[i-1]]
-    }
+  # for dplyr data masking
+  score <- score_range <- score_sd <- NULL
 
+  # manual import for clean R CMD CHECK
+  `:=` <- rlang::`:=`
+
+
+  ################################.
+  # INPUT TEXT SETUP ----
+
+  # VECTOR INPUT: set up
+  if (is.vector(input_text)){
+    text_column <- "sentences"
+    input_text <- dplyr::tibble(sentences = stringr::str_trim(input_text))
   }
 
-  return (vec_lagged1)
+
+  dict_names <- unique(dictionaries$dictionary)
+
+  if (!"score" %in% colnames(dictionaries)) dictionaries$score <- 1
+
+  results <- dplyr::tibble(.rows = nrow(input_text))
+
+  just_text <- input_text[,text_column]
+
+  for (dict_name in dict_names){
+    #message(dict_name)
+    dictionary <- dplyr::filter(dictionaries, dictionary == dict_name)
+
+    result <- tardis::tardis(input_text = just_text, text_column = text_column, dict_sentiments = dictionary, ... )
+
+    result <- dplyr::rename(result,
+                            !!rlang::sym(paste0("score_", dict_name))  := score,
+                            !!rlang::sym(paste0("score_", dict_name, "_sd"))    := score_sd,
+                            !!rlang::sym(paste0("score_", dict_name, "_range")) := score_range,
+    )
+
+    result[,text_column] <- NULL
+
+    results <- dplyr::bind_cols(results, result)
+  }
+
+  dplyr::bind_cols(input_text, results)
 }
+#
+
+# https://nrc.canada.ca/en/research-development/products-services/technical-advisory-services/sentiment-emotion-lexicons
+# dictionaries <- readr::read_csv("/mnt/c/Users/chris/Downloads/tardis_dict_test.csv") %>%
+#   dplyr::mutate(score = 1, token = ngram) %>%
+#   dplyr::rename(dictionary = cluster)
+
+# input_text <- readr::read_csv("/mnt/c/Users/chris/Downloads/tardis_dict_text.csv")
+
+# text_column <- "body"
+# nrc_emotion <- textdata::lexicon_nrc() %>%
+#   dplyr::rename(token = word, dictionary = sentiment) %>%
+#   dplyr::mutate(score = 1)
+#
+# input_text <- pushshiftR::get_reddit_comments(q = "corgis", size = 500)
+#
+# text <- input_text %>%
+#   select(body)
+#
+# text <- dplyr::tibble(body = c("I am so angry!", "I am angry.",
+# "I'm not angry.", "Your mother and I aren't angry, we're just disappointed.",
+# "I can't wait!"))
+#
+# test <- tardis_multidict(input_text = text, text_column = "body", dictionaries = nrc_emotion, dict_negations = "none") %>%
+#   dplyr::select(-tidyselect::contains(c("sd", "range")))
+#
+# test <- tardis_multidict(input_text = text, text_column = "body", dictionaries = nrc_emotion) %>%
+#   dplyr::select(-tidyselect::contains(c("sd", "range")))
+#
+#
+#
+# test <- tardis_multidict(input_text, "body", sdf, simple_count = TRUE)
+#
+#
+# testt <- dplyr::select(test, body, tidyselect::contains("score"))
+#
+#
+# z <- function(input_text, ...) {
+#   tardis::tardis(input_text, ...)
+# }
+#
+# z(" very happy")
+#
+# #
+# library(magrittr)
+# nrc_emotion <- textdata::lexicon_nrc() %>%
+# dplyr::rename(token = word, dictionary = sentiment)
+#
+# # set up some input text
+# text <- dplyr::tibble(body = c("I am so angry!", "I am angry.",
+# "I'm not angry.", "Your mother and I aren't angry, we're just disappointed."))
+#
+# emotions <- tardis::tardis_multidict(input_text = text, text_column = "body", dictionaries = nrc_emotion) %>%
+# dplyr::select(body, score_anger, score_sadness)
+#
+# emotions
