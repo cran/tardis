@@ -1,7 +1,7 @@
-965074781a82e034ff70feefc274447e *DESCRIPTION
+aa0ca8b43cc959bfe8d2af4c7688b90b *DESCRIPTION
 8de8189713ade5e63b2dff781c7ce9b5 *LICENSE
 e1706dfb16e935ff46459201f335b21d *NAMESPACE
-2bc4d6b2e99d52c598097c46d4dee1f2 *NEWS.md
+a763a3b1e33a36d88f9dd00421cdec71 *NEWS.md
 8a19bc246b04ccdd64a0b06d2e66ec3c *R/cpp11.R
 929c641f098e1d129ad653a8f5f28d67 *R/data.R
 2a8c0bd0802a1bf90b3fd3017c850df0 *R/functions.R
@@ -9,13 +9,13 @@ e1706dfb16e935ff46459201f335b21d *NAMESPACE
 bc5026d823874dfd801c603bb45c017b *R/tardis.R
 b56ff2b193ecba52f9ec7f3b10cca008 *R/utils-pipe.R
 bb95d2facd68960fa28b35df5f594400 *README.md
-2b5c708ec630ff0cafdad1cba059acda *build/vignette.rds
+d49f18dbd2f7649924acbce747f6f838 *build/vignette.rds
 32ed71d6e0311bfc35c9955ef86e6b00 *data/dict_modifiers.rda
 76e14adfe2a4f2be17e22bae1a9711f3 *data/dict_negations.rda
 afc81c033f419d31d8787738435e0426 *data/dict_tardis_sentiment.rda
-b84a98183a85c9e27864b88de9346adc *inst/doc/tardis.R
+a1d0c336d85df534b4e4fd192474176b *inst/doc/tardis.R
 e0d910dc6675c9a9e3a8c76804820954 *inst/doc/tardis.Rmd
-c4faaf048047107a018820904dda2c73 *inst/doc/tardis.html
+eee1a8946ff6a6df17af64c83861e717 *inst/doc/tardis.html
 10236d23d7a80e91a8cd49913db79814 *man/dict_modifiers.Rd
 b61a629b4e6541b43c58442a7a38c046 *man/dict_negations.Rd
 9a5f79bbb1cc546169edefe4a6a79924 *man/dict_tardis_sentiment.Rd
